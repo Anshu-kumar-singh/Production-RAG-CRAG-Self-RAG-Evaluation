@@ -1,11 +1,11 @@
-# importing the req thing and env file data
 from typing import List, TypedDict, Literal
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import re
 
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.vectorstores import FAISS
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain_groq import ChatGroq
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
@@ -15,31 +15,22 @@ from dotenv import load_dotenv
 
 from langchain_community.tools.tavily_search import TavilySearchResults
 
+import tempfile
+import os
+
 load_dotenv()
 
-# Data + Index
+#---------------------
+# Embedding + LLM (shared setup, no vector store until PDFs are loaded)
+#---------------------
+embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+retriever = None  # set by set_active_vector_store()
 
-# loading 3 doc with help of pdf loader
-pdf_paths = ["./documents/book1.pdf", "./documents/book2.pdf", "./documents/book3.pdf"]  # <- Streamlit will pass this list
-
-docs = []
-for path in pdf_paths:
-    docs += PyPDFLoader(path).load()
-
-# text splitting
-chunks = RecursiveCharacterTextSplitter(chunk_size=900, chunk_overlap=150).split_documents(docs)
-for d in chunks:
-    d.page_content = d.page_content.encode("utf-8", "ignore").decode("utf-8", "ignore")
-
-
-# Embedding
-embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
-vector_store = FAISS.from_documents(chunks, embeddings) # storing it in vector store
-retriever = vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 4}) #retriver
-
-
+#---------------------
 # loading the model
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+#---------------------
+llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
+
 
 # deciding the uppder limit and lower limit so we can differentiate btw correct and incorrect
 UPPER_TH = 0.7
@@ -85,7 +76,58 @@ class State(TypedDict):
 
 
 # -----------------------------
-# Self-RAG front gate: decide if retrieval is needed at all
+# PDF loader — Windows-safe via tempfile
+# -----------------------------
+def set_active_vector_store(paths: list):
+    global retriever
+    docs = []
+    for p in paths:
+        docs += PyPDFLoader(p).load()
+        os.unlink(p)  # clean up temp file after loading
+
+    #---------------------
+    # text splitting
+    #---------------------
+    chunks = RecursiveCharacterTextSplitter(chunk_size=900, chunk_overlap=150).split_documents(docs)
+    for d in chunks:
+        d.page_content = d.page_content.encode("utf-8", "ignore").decode("utf-8", "ignore")
+
+    #---------------------
+    # Embedding
+    #---------------------
+    vs = FAISS.from_documents(chunks, embeddings) # storing it in vector store
+    retriever = vs.as_retriever(search_type="similarity", search_kwargs={"k": 4}) #retriver
+
+
+# -----------------------------
+# Initial state builder
+# -----------------------------
+def build_initial_state(question: str) -> dict:
+    return {
+        "question": question,
+        "docs": [],
+        "good_docs": [],
+        "verdict": "",
+        "reason": "",
+        "strips": [],
+        "kept_strips": [],
+        "refined_context": "",
+        "web_query": "",
+        "web_docs": [],
+        "answer": "",
+        # Self-RAG additions
+        "need_retrieval": True,
+        "issup": "",
+        "evidence": [],
+        "retries": 0,
+        "isuse": "",
+        "use_reason": "",
+        "rewrite_tries": 0,
+    }
+
+
+# -----------------------------
+# Self-RAG front gate: decide if retrieval is needed at all(decied_retrievel)
 # -----------------------------
 class RetrieveDecision(BaseModel):
     should_retrieve: bool = Field(
@@ -116,13 +158,14 @@ def decide_retrieval(state: State) -> State:# ********** Note this type of invok
         decide_retrieval_prompt.format_messages(question=state["question"])
     )
     return {"need_retrieval": decision.should_retrieve}
+
 # ************note this way of directing .
 def route_after_decide(state: State) -> Literal["generate_direct", "retrieve"]: # This function doesn't go anywhere itself. Instead, it tells LangGraph which node to execute next.
     return "retrieve" if state["need_retrieval"] else "generate_direct"
 
 
 # -----------------------------
-# Self-RAG front gate: direct answer, no retrieval needed
+# Self-RAG front gate: direct answer, no retrieval needed (generater_dict)
 # -----------------------------
 direct_generation_prompt = ChatPromptTemplate.from_messages( #**** note this is form_message not prompt_template .
     [
@@ -140,14 +183,17 @@ def generate_direct(state: State) -> State:
     out = llm.invoke(direct_generation_prompt.format_messages(question=state["question"]))
     return {"answer": out.content}
 
-
+# -----------------------------
 # Retrieve as per q
+# -----------------------------
+
 def retrieve_node(state: State) -> State:
     q = state["question"]
     return {"docs": retriever.invoke(q)}  # we get the query from question state and use that for retriving the data
 
-
+# -----------------------------
 # Score-based doc evaluator
+# -----------------------------
 
 class DocEvalScore(BaseModel): # This Creates a structured output format. (froceing the llm to give the out put in this formate only )
     score: float # stores relevance score.
@@ -211,9 +257,9 @@ def eval_each_doc_node(state: State) -> State:
         "reason": f"No chunk scored > {UPPER_TH}, but not all were < {LOWER_TH}.",
     }
 
-
-# Sentence-level DECOMPOSER
-
+# -----------------------------
+# Sentence-level DECOMPOSER (knowledge_refinement)
+# -----------------------------
 
 # this part splits the retrived sentence into parts.
 def decompose_to_sentences(text: str) -> List[str]:
@@ -240,13 +286,6 @@ filter_prompt = ChatPromptTemplate.from_messages(
 
 filter_chain = filter_prompt | llm.with_structured_output(KeepOrDrop) # it remove the sentance which are not usefull according to the query
 
-
-# -----------------------------
-# Knowledge refinement
-# (CORRECT => internal only)
-# (INCORRECT => web only)
-# (AMBIGUOUS => internal + web)
-# -----------------------------
 
 # This node is basically a context cleaner.
 # It takes the selected documents, breaks them into sentences, removes irrelevant sentences using an LLM filter, and returns a clean context for answer generation.
@@ -316,12 +355,13 @@ def rewrite_query_node(state: State) -> State: # Creates a LangGraph node.
 # -----------------------------
 tavily = TavilySearchResults(max_results=5) # create a tavily search tool
 
-
 def web_search_node(state: State) -> State:
+    
     q = state.get("web_query") or state["question"] # getting the search query (if we got the web querry then q is a web querry else q is the main query )
     results = tavily.invoke({"query": q}) # Send query to Tavily.
 
     web_docs: List[Document] = [] # Store search results as LangChain Documents.
+
     for r in results or []: # Loop through every search result.
         title = r.get("title", "") # Extract Title
         url = r.get("url", "")
@@ -354,7 +394,7 @@ def generate(state: State) -> State:
 
 
 # -----------------------------
-# Self-RAG back-end check 1: IsSUP (is the answer grounded in refined_context?)
+# Self-RAG back-end check 1: IsSUP (is the answer grounded in refined_context?)( LLM didn't go beyond that context(doesnot halucinate ))
 # -----------------------------
 class IsSUPDecision(BaseModel):
     issup: Literal["fully_supported", "partially_supported", "no_support"]
@@ -594,12 +634,10 @@ g.add_conditional_edges(
 
 app = g.compile()
 
-app
-
 
 # -----------------------------
 # Plain RAG (baseline) — just retrieve + generate, no grading,
-# no web fallback, no self-check. This is what we compare CRAG+Self-RAG against.
+# But in the code, all of that (load, split, embedding, retriever) is already done at the top level (shared setup), and plain_rag_answer just reuses that same retriever. There's no separate load/split/embed for plain RAG.
 # -----------------------------
 def plain_rag_answer(question: str) -> str:
     docs = retriever.invoke(question)  # plain retrieval, no grading
@@ -651,48 +689,3 @@ def compare_node(state: State) -> State:
         "better": decision.better,
         "comparison_reason": decision.reason,
     }
-
-
-# -----------------------------
-# Run example
-# -----------------------------
-res = app.invoke(
-    {
-        "question": "Batch normalization vs layer normalization",
-        "docs": [],
-        "good_docs": [],
-        "verdict": "",
-        "reason": "",
-        "strips": [],
-        "kept_strips": [],
-        "refined_context": "",
-        "web_query": "",
-        "web_docs": [],
-        "answer": "",
-
-        # Self-RAG additions
-        "need_retrieval": True,
-        "issup": "",
-        "evidence": [],
-        "retries": 0,
-        "isuse": "",
-        "use_reason": "",
-        "rewrite_tries": 0,
-    },
-    config={"recursion_limit": 80},  # allow revise / re-correction loops
-)
-
-print("NEED_RETRIEVAL:", res.get("need_retrieval"))
-print("VERDICT:", res.get("verdict"))
-print("REASON:", res.get("reason"))
-print("WEB_QUERY:", res.get("web_query"))
-print("ISSUP:", res.get("issup"), "| retries:", res.get("retries"))
-print("ISUSE:", res.get("isuse"), "| reason:", res.get("use_reason"), "| rewrite_tries:", res.get("rewrite_tries"))
-print("\nOUTPUT:\n", res.get("answer"))
-
-# -----------------------------
-# Comparison: plain RAG vs CRAG + Self-RAG (for the same question)
-# -----------------------------
-comparison = compare_node(res)
-print("\nPLAIN RAG ANSWER:\n", comparison["rag_answer"])
-print("\nBETTER:", comparison["better"], "| reason:", comparison["comparison_reason"])
