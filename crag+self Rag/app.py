@@ -1,5 +1,7 @@
 import streamlit as st
-from backend import set_active_vector_store, build_initial_state, app, compare_node
+import tempfile
+import os
+from backend import app, compare_node, set_active_vector_store, build_initial_state
 
 st.set_page_config(page_title="CRAG + Self-RAG", page_icon="📚", layout="centered")
 
@@ -29,7 +31,7 @@ else:
 
 # ── SECTION 1: HERO ──
 st.title("📚 CRAG + Self-RAG")
-st.caption("LangGraph · OpenAI · Tavily · FAISS")
+st.caption("LangGraph · Groq · Tavily · FAISS")
 st.markdown("Upload your PDFs, ask a question. The agent retrieves, grades its own retrieval, falls back to web search if needed, and checks its own answer before showing it.")
 st.markdown("`Retrieve` → `Grade` → `Web Search (if needed)` → `Refine` → `Generate` → `Self-Check`")
 st.divider()
@@ -42,10 +44,10 @@ if st.button("Load Documents", disabled=st.session_state.phase != "input"):
     if uploaded_files:
         paths = []
         for f in uploaded_files:
-            path = f"/tmp/{f.name}"
-            with open(path, "wb") as out:
-                out.write(f.getbuffer())
-            paths.append(path)
+            # Windows-safe: use tempfile instead of hardcoded /tmp/
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                tmp.write(f.getbuffer())
+                paths.append(tmp.name)
         set_active_vector_store(paths)
         st.session_state.docs_loaded = True
         st.success(f"Loaded {len(paths)} PDF(s).")
