@@ -2,8 +2,10 @@ streamlit
 langgraph
 langchain-core
 langchain-community
-langchain-openai
+langchain-groq
+langchain-huggingface
 langchain-text-splitters
+sentence-transformers
 pydantic
 python-dotenv
 faiss-cpu
