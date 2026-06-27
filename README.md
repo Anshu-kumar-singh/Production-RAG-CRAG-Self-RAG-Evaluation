@@ -1,34 +1,50 @@
-# CRAG + Self-RAG PDF Question Answering System
+# 📚 CRAG + Self-RAG PDF Question Answering System
 
 An advanced Retrieval-Augmented Generation (RAG) application that combines **CRAG (Corrective RAG)** and **Self-RAG** techniques to improve retrieval quality, answer grounding, and response reliability.
 
-The system allows users to upload PDF documents, ask questions, and receive answers generated through a multi-stage retrieval and verification pipeline. It also includes a **Plain RAG baseline** and an **LLM-based comparison module** to evaluate whether CRAG + Self-RAG produces better results.
+🚀 **Live Demo:** https://anhu321-production-rag-crag-selfrag.hf.space
+
+The system allows users to upload PDF documents, ask questions, and receive answers generated through a multi-stage retrieval and verification pipeline. It also includes a **Plain RAG baseline** and an **LLM-based comparison module** to evaluate whether **CRAG + Self-RAG** produces better results.
 
 ---
 
-## Features
+# 🚀 Live Demo
 
-### Document Intelligence
+🌐 **Try the application here:**
+
+**https://anhu321-production-rag-crag-selfrag.hf.space**
+
+No installation required—simply upload your PDFs and start asking questions.
+
+---
+
+# ✨ Features
+
+## 📄 Document Intelligence
 
 * Upload and query multiple PDF documents
 * Automatic document chunking and embedding
 * FAISS vector database for semantic retrieval
-* OpenAI embeddings for similarity search
+* OpenAI Embeddings for similarity search
 
-### CRAG (Corrective RAG)
+---
+
+## 🧠 CRAG (Corrective RAG)
 
 * Retrieval quality evaluation
 * Document relevance scoring
 * Retrieval verdict classification:
 
-  * CORRECT
-  * AMBIGUOUS
-  * INCORRECT
-* Automatic web search fallback using Tavily
-* Query rewriting for better web retrieval
+  * ✅ CORRECT
+  * ⚠️ AMBIGUOUS
+  * ❌ INCORRECT
+* Automatic Tavily web search fallback
+* Query rewriting for improved retrieval
 * Context refinement through sentence-level filtering
 
-### Self-RAG
+---
+
+## 🔍 Self-RAG
 
 * Retrieval decision gate
 * Grounding verification (IsSUP)
@@ -36,7 +52,9 @@ The system allows users to upload PDF documents, ask questions, and receive answ
 * Automatic answer revision loop
 * Recursive answer correction workflow
 
-### Evaluation & Benchmarking
+---
+
+## 📊 Evaluation & Benchmarking
 
 * Traditional RAG baseline implementation
 * Side-by-side comparison against CRAG + Self-RAG
@@ -46,9 +64,11 @@ The system allows users to upload PDF documents, ask questions, and receive answ
   * Accuracy
   * Groundedness
   * Completeness
-  * Answer quality
+  * Overall Answer Quality
 
-### User Interface
+---
+
+## 💻 User Interface
 
 * Streamlit-based interface
 * PDF upload support
@@ -58,93 +78,45 @@ The system allows users to upload PDF documents, ask questions, and receive answ
 
 ---
 
-# Architecture
+# 🏗️ Architecture
 
-## Main Pipeline (CRAG + Self-RAG)
+The application consists of **three integrated workflows**:
 
-```text
-User Question
-      │
-      ▼
-Decide Retrieval Needed?
-      │
- ┌────┴────┐
- │         │
- ▼         ▼
-Direct    Retrieve
-Answer    Documents
-              │
-              ▼
-      Evaluate Documents
-              │
-              ▼
-     CORRECT / AMBIGUOUS /
-         INCORRECT
-              │
-              ▼
-      Rewrite Query
-              │
-              ▼
-         Web Search
-              │
-              ▼
-      Knowledge Refinement
-              │
-              ▼
-       Generate Answer
-              │
-              ▼
-     IsSUP Verification
-              │
-     Supported Answer?
-              │
-      ┌───────┴───────┐
-      │               │
-      ▼               ▼
- Accept         Revise Answer
-      │               │
-      └───────┬───────┘
-              ▼
-       IsUSE Check
-              │
-              ▼
-       Final Answer
+1. **Plain RAG Baseline**
+2. **CRAG + Self-RAG Pipeline**
+3. **LLM Evaluation Pipeline**
+
+The workflow follows the architecture below:
+
+> **Architecture Diagram**
+
+*(Insert the provided pipeline image here in your GitHub README.)*
+
+```
+docs/pipeline.png
 ```
 
-## Plain RAG Baseline
+> *(Move the uploaded image into a folder such as `docs/` or `assets/` and reference it as:)*
 
-```text
-User Question
-      │
-      ▼
-Retrieve Documents
-      │
-      ▼
-Generate Answer
-      │
-      ▼
-Plain RAG Output
+```markdown
+![CRAG + Self-RAG Pipeline](docs/pipeline.png)
 ```
 
-## Answer Comparison Pipeline
+The pipeline performs:
 
-```text
-CRAG + Self-RAG Answer
-            │
-            ▼
-      Comparison
-        Evaluator
-            ▲
-            │
-    Plain RAG Answer
-            │
-            ▼
- Better Answer Selected
-```
+* Retrieval decision (Self-RAG)
+* PDF retrieval
+* Retrieval quality evaluation (CRAG)
+* Knowledge refinement
+* Query rewriting when needed
+* Recursive correction loop
+* Final answer generation
+* Comparison against a Plain RAG baseline
+* LLM-based evaluation to determine the better response
 
 ---
 
-# Tech Stack
+# 🛠️ Tech Stack
 
 * LangGraph
 * LangChain
@@ -159,7 +131,7 @@ CRAG + Self-RAG Answer
 
 ---
 
-# Installation
+# ⚙️ Installation
 
 ## Clone Repository
 
@@ -168,11 +140,15 @@ git clone https://github.com/yourusername/crag-self-rag.git
 cd crag-self-rag
 ```
 
+---
+
 ## Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
+
+---
 
 ## Environment Variables
 
@@ -185,87 +161,84 @@ TAVILY_API_KEY=your_tavily_api_key
 
 ---
 
-# Running the Application
+# ▶️ Running the Application
+
+## Option 1: Use the Live Demo
+
+Open your browser and visit:
+
+**https://anhu321-production-rag-crag-selfrag.hf.space**
+
+---
+
+## Option 2: Run Locally
 
 ```bash
 streamlit run app.py
 ```
 
-Open the local Streamlit URL displayed in the terminal.
+The application will launch in your browser using the local Streamlit server.
 
 ---
 
-# How It Works
+# 🔄 How It Works
 
-## Step 1: PDF Processing
+## Step 1 — PDF Processing
 
 Uploaded PDFs are:
 
 1. Loaded using PyPDFLoader
-2. Split into chunks
+2. Split into semantic chunks
 3. Embedded using OpenAI Embeddings
 4. Stored in a FAISS vector database
 
 ---
 
-## Step 2: Self-RAG Retrieval Decision
+## Step 2 — Self-RAG Retrieval Decision
 
-Before retrieving documents, the system determines whether external knowledge is required.
+Before retrieval, the system determines whether external knowledge is actually required.
 
 Possible outcomes:
 
-* Retrieval Required → Continue to CRAG pipeline
+* Retrieval Required → Continue to CRAG
 * Retrieval Not Required → Generate answer directly
 
 ---
 
-## Step 3: CRAG Retrieval Evaluation
+## Step 3 — CRAG Retrieval Evaluation
 
-Retrieved chunks are scored individually.
+Retrieved chunks are graded as:
 
-### CORRECT
+### ✅ CORRECT
 
-At least one document is highly relevant.
+Highly relevant evidence found.
 
-### AMBIGUOUS
+### ⚠️ AMBIGUOUS
 
-Some relevant information exists but confidence is limited.
+Partial evidence available.
 
-### INCORRECT
+### ❌ INCORRECT
 
-Retrieved documents are not useful.
-
----
-
-## Step 4: Web Search Fallback
-
-For ambiguous or incorrect retrieval:
-
-* Query is rewritten
-* Tavily web search is executed
-* Web results are converted into documents
-* Retrieved knowledge is merged with existing context
+Retrieved information is not useful.
 
 ---
 
-## Step 5: Knowledge Refinement
+## Step 4 — Knowledge Refinement
 
-Documents are:
+Depending on the retrieval quality:
 
-* Decomposed into sentences
-* Evaluated individually
-* Irrelevant sentences removed
-* Useful context preserved
-
-This creates a cleaner context for generation.
+* Relevant context is retained
+* Irrelevant sentences are removed
+* Query rewriting is performed if necessary
+* Tavily web search supplements missing knowledge
 
 ---
 
-## Step 6: Answer Generation
+## Step 5 — Answer Generation
 
-The LLM generates an answer using only the refined context.
+The LLM generates a grounded answer using the refined knowledge.
 
-If sufficient information is unavailable, the model returns:
+If insufficient evidence exists, the model responds:
 
 ```text
 I don't know.
@@ -273,11 +246,11 @@ I don't know.
 
 ---
 
-## Step 7: Self-RAG Verification
+## Step 6 — Self-RAG Verification
 
-### IsSUP (Support Check)
+### IsSUP (Grounding Check)
 
-Evaluates whether the answer is grounded in the retrieved context.
+Determines whether the generated answer is supported by the retrieved knowledge.
 
 Possible outcomes:
 
@@ -285,24 +258,24 @@ Possible outcomes:
 * partially_supported
 * no_support
 
-If support is insufficient, the answer is revised.
+Unsupported answers are revised automatically.
 
 ---
 
 ### IsUSE (Usefulness Check)
 
-Evaluates whether the answer actually satisfies the user's question.
+Determines whether the answer actually satisfies the user's question.
 
 Possible outcomes:
 
 * useful
 * not_useful
 
-If not useful, the system can restart the correction cycle.
+If not useful, the workflow rewrites the query and restarts the correction cycle.
 
 ---
 
-## Step 8: Plain RAG Benchmark
+## Step 7 — Plain RAG Baseline
 
 A traditional RAG pipeline runs independently:
 
@@ -310,34 +283,35 @@ A traditional RAG pipeline runs independently:
 Retrieve → Generate
 ```
 
-No:
+This baseline **does not include**:
 
 * Retrieval grading
-* Web search
-* Grounding checks
-* Usefulness checks
-
-This serves as a baseline for evaluation.
+* Web search fallback
+* Grounding verification
+* Answer usefulness evaluation
 
 ---
 
-## Step 9: Answer Comparison
+## Step 8 — LLM-Based Evaluation
 
 The system compares:
 
-* Plain RAG Answer
-* CRAG + Self-RAG Answer
+* Plain RAG Answer (Result A)
+* CRAG + Self-RAG Answer (Result B)
 
-An evaluator model judges which answer performs better based on:
+An evaluator LLM scores both responses based on:
 
 * Accuracy
 * Grounding
 * Completeness
 * Relevance
+* Overall Answer Quality
+
+The comparison results are displayed on the dashboard.
 
 ---
 
-# Project Structure
+# 📂 Project Structure
 
 ```text
 .
@@ -348,13 +322,15 @@ An evaluator model judges which answer performs better based on:
 │   ├── book1.pdf
 │   ├── book2.pdf
 │   └── book3.pdf
+├── docs/
+│   └── pipeline.png
 ├── .env
 └── README.md
 ```
 
 ---
 
-# Future Improvements
+# 🚀 Future Improvements
 
 * Hybrid Search (BM25 + Vector Search)
 * Source Citations
@@ -367,19 +343,24 @@ An evaluator model judges which answer performs better based on:
 
 ---
 
-# Why This Project?
+# 💡 Why This Project?
 
-Traditional RAG systems often fail when retrieval quality is poor. This project addresses those limitations by combining:
+Traditional RAG systems often fail when retrieval quality is poor.
 
-* CRAG for retrieval correction
-* Self-RAG for answer verification
-* Web fallback for missing knowledge
-* Benchmarking against standard RAG
+This project addresses those limitations by combining:
 
-The result is a more reliable and self-correcting question-answering system.
+* ✅ CRAG for retrieval correction
+* ✅ Self-RAG for answer verification
+* ✅ Query rewriting and web fallback
+* ✅ Knowledge refinement
+* ✅ Recursive answer improvement
+* ✅ Benchmarking against Plain RAG
+* ✅ LLM-based answer evaluation
+
+The result is a more reliable, self-correcting, and production-oriented Retrieval-Augmented Generation system.
 
 ---
 
-# License
+# 📄 License
 
 MIT License
